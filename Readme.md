@@ -31,4 +31,4 @@ $ sh run.sh
 Steal
 -----
 
-Just [do what the fuck you want to](http://www.wtfpl.net/about/).
+[wtfpl](http://www.wtfpl.net/about/).
