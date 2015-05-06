@@ -1,6 +1,11 @@
 Animated Gifs In The Terminal
 =============================
 
+What?
+-----
+
+![screencap](screencap.gif)
+
 Try
 ---
 
