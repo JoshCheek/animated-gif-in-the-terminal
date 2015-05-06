@@ -1,3 +1,5 @@
+require 'zlib'
+
 class ConsolePixel
   attr_accessor :red, :green, :blue, :opaque
 
@@ -55,17 +57,22 @@ Magick::ImageList
     ansi_frames << ansi_frame
   }
 
-clear       = "\e[H\e[2J".inspect
-hide_cursor = "\e[?25l".inspect
-show_cursor = "\e[?25h".inspect
+compressed_frames = ansi_frames.map { |frame| Zlib::Deflate.deflate frame }
+clear             = "\e[H\e[2J".inspect
+hide_cursor       = "\e[?25l".inspect
+show_cursor       = "\e[?25h".inspect
 
 puts <<PROGRAM
-frames = #{ansi_frames.inspect}
-print #{clear}#{hide_cursor}
-frames.each.with_index 1 do |frame, nxt|
-  print frame
-  sleep 0.1
-  print #{clear} if frames[nxt]
+require 'zlib'
+frames = #{compressed_frames.inspect}
+begin
+  print #{clear}#{hide_cursor}
+  frames.each.with_index 1 do |frame, nxt|
+    print Zlib::Inflate.inflate frame
+    sleep 0.1
+    print #{clear} if frames[nxt]
+  end
+ensure
+  print #{show_cursor}
 end
-print #{show_cursor}
 PROGRAM
