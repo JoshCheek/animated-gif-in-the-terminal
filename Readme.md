@@ -4,7 +4,7 @@ Animated Gifs In The Terminal
 Example:
 
 ```sh
-$ curl -L https://t.co/16s9QPMcmU | ruby -
+$ curl -L http://bit.ly/1DRCK7q | ruby -
 ```
 
 Run it:
