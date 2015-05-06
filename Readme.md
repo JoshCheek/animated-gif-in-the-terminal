@@ -10,7 +10,7 @@ Try
 ---
 
 ```sh
-$ curl -L http://bit.ly/1DRCK7q | ruby -
+$ curl -sL http://bit.ly/1DRCK7q | ruby -
 ```
 
 Install
