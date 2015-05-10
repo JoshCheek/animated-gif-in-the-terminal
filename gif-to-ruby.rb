@@ -1,8 +1,54 @@
 require 'zlib'
 require 'rmagick'
 
-    # kinda wish this was on Module
 module ConsoleGif
+  module Binary
+    def self.parse(args, defaults)
+      parsed = {
+        errors:         [],
+        style:          :small,
+        output_file:    defaults[:default_out],
+        input_file:     defaults[:default_in],
+        print_help:     false,
+        filenames_seen: [],
+      }
+
+      args = args.dup
+      until args.empty?
+        arg = args.shift
+        case arg
+        when '-s', '--style'
+          style  = args.shift
+          styles = ['sharp', 'small']
+          if styles.include? style
+            parsed[:style] = style.intern
+          else
+            parsed[:errors] << "Invalid style: #{style.inspect}"
+          end
+        when '-o', '--output'
+          outfile = args.shift
+          if outfile.nil?
+            parsed[:errors] << "#{arg.inspect} expects an argument of the output filename"
+          elsif outfile != '-'
+            parsed[:output_file] = outfile
+          end
+        when '-h', '--help'
+          parsed[:print_help] = true
+        else
+          parsed[:filenames_seen] << arg
+          parsed[:input_file] = arg
+          parsed[:input_file] = defaults[:default_in] if arg == '-'
+        end
+      end
+
+      if 1 < parsed[:filenames_seen].length
+        parsed[:errors] << "Can only process one filename, but saw: #{parsed[:filenames_seen].map(&:inspect).join(', ')}"
+      end
+
+      parsed
+    end
+  end
+
   class Pixel
     [ def convert(original_color, original_resolution)
         new_value = resolution * original_color / original_resolution.to_f
@@ -334,6 +380,92 @@ else
       end
     end
 
+
+    context 'commandline arguments' do
+      def parse(args, defaults={})
+        ConsoleGif::Binary.parse(args, defaults)
+      end
+
+      it 'doesn\'t mutate the args it parses' do
+        args = ['-s', 'sharp', '-o', 'out', 'in', '-h']
+        parse args
+        expect(args).to eq ['-s', 'sharp', '-o', 'out', 'in', '-h']
+      end
+
+      describe 'style' do
+        it 'can be given a style with -s and --style' do
+          expect(parse(['-s',      'sharp'])[:style]).to eq :sharp
+          expect(parse(['--style', 'sharp'])[:style]).to eq :sharp
+        end
+
+        it 'accepts values of small and sharp' do
+          expect(parse(['-s', 'small'])[:style]).to eq :small
+          expect(parse(['-s', 'sharp'])[:style]).to eq :sharp
+        end
+
+        it 'sets an error if the style is unknown' do
+          expect(parse(['-s', 'small'])[:errors]).to be_empty
+          expect(parse(['-s', 'wat'])[:errors]).to_not be_empty
+        end
+
+        it 'defaults to small' do
+          expect(parse([])[:style]).to eq :small
+        end
+      end
+
+      describe 'output_file' do
+        it 'can be given an output file with -o and --output' do
+          expect(parse(['-o', 'fn'],       default_out: :stdout)[:output_file]).to eq 'fn'
+          expect(parse(['--output', 'fn'], default_out: :stdout)[:output_file]).to eq 'fn'
+        end
+
+        it 'defaults to stdout' do
+          expect(parse([], default_out: :stdout)[:output_file]).to eq :stdout
+        end
+
+        specify 'output file of "-" means stdout' do
+          expect(parse(['-o', '-'], default_out: :stdout)[:output_file]).to eq :stdout
+        end
+
+        it 'sets an error if the output file is not provided' do
+          expect(parse(['-o', 'fn'], default_out: :stdout)[:errors]).to be_empty
+          expect(parse(['-o'],       default_out: :stdout)[:errors]).to_not be_empty
+        end
+      end
+
+      describe 'input_file' do
+        it 'is the first non-flag/arg' do
+          expect(parse(['infile'], default_in: :stdin)[:input_file]).to eq 'infile'
+        end
+
+        it 'sets an error if given multiple input files' do
+          expect(parse(['f1'],                        default_in: :stdin)[:errors]).to be_empty
+          expect(parse(['f1'],                        default_in: :stdin)[:errors]).to be_empty
+          expect(parse(['f1', 'f2'],                  default_in: :stdin)[:errors]).to_not be_empty
+          expect(parse(['f1', 'f2', '-o', '-', 'f3'], default_in: :stdin)[:filenames_seen])
+                .to eq ['f1', 'f2',            'f3']
+        end
+
+        specify 'input file of "-" means stdin' do
+          expect(parse(['-'], default_in: :stdin)[:input_file]).to eq :stdin
+          expect(parse(['-'], default_in: :stdin)[:errors]).to be_empty
+        end
+
+        it 'defaults to "-" if the input file is not provided' do
+          expect(parse([], default_in: :stdin)[:input_file]).to eq :stdin
+        end
+      end
+
+      describe 'print_help' do
+        it 'can be told to print help with "-h" and "--help"' do
+          expect(parse([])[:print_help]).to eq false
+          expect(parse(['-h'])[:print_help]).to eq true
+          expect(parse(['--help'])[:print_help]).to eq true
+        end
+      end
+    end
+
+
     context 'integration' do
       example 'small image' do
         expect(animation_for('owl.gif', style: :small).to_rb)
@@ -345,8 +477,10 @@ else
           .to eq File.read(fixture_path 'owl-sharp.rb')
       end
 
+      # could hijack the env and load this code, but don't care that much right now
       specify 'animated image has a 0.1s delay between frames'
       it 'hides the cursor at the beginning and shows it at the end'
+      it 'ensures the cursor is re-shown, even if errors get raised'
     end
   end
 end
