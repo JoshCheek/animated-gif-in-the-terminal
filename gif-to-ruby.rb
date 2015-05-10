@@ -28,13 +28,13 @@ module ConsoleGif
     end
 
 
-    attr_accessor :red, :green, :blue, :opaque
+    attr_accessor :red, :green, :blue
 
     def initialize(red:, green:, blue:, resolution:, opaque:)
       self.red    = convert red,   resolution
       self.green  = convert green, resolution
       self.blue   = convert blue,  resolution
-      self.opaque = opaque
+      @opaque     = opaque
     end
 
     def to_ansi
@@ -49,7 +49,13 @@ module ConsoleGif
       opaque? ? "48;5;#{ansi_color}" : bg_off
     end
 
-    alias opaque? opaque
+    def opaque?
+      @opaque
+    end
+
+    def transparent?
+      !opaque?
+    end
 
     def character
       '  '
@@ -94,12 +100,11 @@ module ConsoleGif
         imagelist.each { |frame|
           rows = []
           frame.each_pixel { |pixel, x, y|
-            opaque = pixel.opacity < (0xFFFF * 0.05) # must be mostly opaque to qualify
             rows[y] ||= []
-            rows[y][x] = Pixel.new red:      pixel.red,
-                                   green:    pixel.green,
-                                   blue:     pixel.blue,
-                                   opaque:   opaque,
+            rows[y][x] = Pixel.new red:        pixel.red,
+                                   green:      pixel.green,
+                                   blue:       pixel.blue,
+                                   opaque:     pixel.opacity.zero?, # -.^
                                    resolution: 0xFFFF
           }
           frames << rows
@@ -127,31 +132,31 @@ module ConsoleGif
     end
 
     def to_rb
-  # rows << rows.first.map { Pixel.new 0, 0, 0, false } if rows.length.odd?
-  # ansi_frame = rows.each_slice(2)
-  #                  .map(&:transpose)
-  #                  .join("\n")
-  # ansi_frames << ansi_frame
-# }
+      compressed_frames = ansi_frames.map { |rows|
+        frame = rows.map { |pixels| pixels.map &:to_ansi }
+                    .map(&:join)
+                    .map(&:inspect)
+          .join()
+                    # .join(",   \n")
+        Zlib::Deflate.deflate(frame)
+      }
 
-      compressed_frames = ansi_frames.map { |frame| Zlib::Deflate.deflate frame }
-      clear             = "\e[H\e[2J".inspect
-      hide_cursor       = "\e[?25l".inspect
-      show_cursor       = "\e[?25h".inspect
-
-      puts <<-PROGRAM.gsub
-      require 'zlib'
-      frames = [#{compressed_frames.map(&:inspect).join("\n")}]
-      begin
-        print #{clear}#{hide_cursor}
-        frames.each.with_index 1 do |frame, nxt|
-          print Zlib::Inflate.inflate frame
-          sleep 0.1
-          print #{clear} if frames[nxt]
+      clear       = "\e[H\e[2J".inspect
+      hide_cursor = "\e[?25l".inspect
+      show_cursor = "\e[?25h".inspect
+      <<-PROGRAM.gsub(/^ {8}/, '')
+        require 'zlib'
+        frames = [#{compressed_frames.join}]
+        begin
+          print #{clear}#{hide_cursor}
+          frames.each.with_index 1 do |frame, nxt|
+            print Zlib::Inflate.inflate frame
+            sleep 0.1
+            print #{clear} if frames[nxt]
+          end
+        ensure
+          print #{show_cursor}
         end
-      ensure
-        print #{show_cursor}
-      end
       PROGRAM
     end
 
@@ -162,10 +167,16 @@ end
 
 
 if $0 !~ /rspec/
+  gifdata = File.read(ARGV[0])
+  puts ConsoleGif::Animation.new(gifdata, :small).to_rb
 else
   RSpec.describe ConsoleGif do
+    def fixture_path(basename)
+      File.join __dir__, 'fixtures', basename
+    end
+
     def animation_for(fixture_filename, style: :small)
-      fixture_filepath = File.join __dir__, 'fixtures', fixture_filename
+      fixture_filepath = fixture_path fixture_filename
       gifdata          = File.read(fixture_filepath)
       ConsoleGif::Animation.new(gifdata, style)
     end
@@ -181,14 +192,14 @@ else
       def assert_pixel(pixel, assertions, description)
         assertions.each do |channel, expected|
           actual = case channel
-                   when :r      then pixel.red
-                   when :g      then pixel.green
-                   when :b      then pixel.blue
-                   when :opaque then pixel.opaque?
+                   when :r           then pixel.red
+                   when :g           then pixel.green
+                   when :b           then pixel.blue
+                   when :opaque      then pixel.opaque?
+                   when :transparent then pixel.transparent?
                    else raise "Unknown channel: #{channel}"
                    end
-          description += " should have #{channel} of #{expected.inspect}, but got #{actual.inspect}"
-          expect(actual).to eq(expected), description
+          expect(actual).to eq(expected), "#{description} should have #{channel} of #{expected.inspect}, but got #{actual.inspect}"
         end
       end
 
@@ -247,8 +258,6 @@ else
       end
 
       it 'knows whether the pixel is tansparent or opaque' do
-        pending 'not sure whether implementation or test is correct'
-        # TODO: double check this is testing what we think it is
         assert_first_pixel 'opaque.gif',      opaque: true,  transparent: false
         assert_first_pixel 'transparent.gif', opaque: false, transparent: true
       end
@@ -326,9 +335,17 @@ else
     end
 
     context 'integration' do
-      example 'small image'
+      example 'small image' do
+        expect(animation_for('owl.gif', style: :small).to_rb)
+          .to eq File.read(fixture_path 'owl-small.rb')
+      end
+
       example 'sharp image'
-      example 'animated image has a delay between frames'
+        # expect(animation_for('owl.gif', style: :sharp).to_rb)
+        #   .to eq File.read(fixture_path, 'whatev')
+
+      specify 'animated image has a 0.1s delay between frames'
+      it 'hides the cursor at the beginning and shows it at the end'
     end
   end
 end

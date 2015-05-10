@@ -23,10 +23,13 @@ def build(filename, frames)
       '-frame', z.to_s,
       *rows.flat_map.with_index { |pixels, y|
         pixels.flat_map.with_index do |pixel, x|
-          r, g, b, a = pixel.fetch(:red), pixel.fetch(:green), pixel.fetch(:blue), pixel.fetch(:alpha, 1)
-          [ "-fill", "RGBA(#{r},#{g},#{b},#{a})",
-            "-draw", "point #{x},#{y}"
-          ]
+          color = if pixel[:transparent]
+            ['-alpha', 'Transparent']
+          else
+            ["-fill", "RGB(#{pixel.fetch :red},#{pixel.fetch :green},#{pixel.fetch :blue})",
+             "-draw", "point #{x},#{y}"
+            ]
+          end
         end
       },
       ')',
@@ -50,9 +53,9 @@ end
   build "blue#{  n.to_s.rjust 3, '0'}.gif", red: 0, green: 0, blue: n
 end
 
-# black/white, transparent/opaque
-build "transparent.gif", red: 0, green: 0, blue: 0, alpha: 1
-build "opaque.gif",      red: 0, green: 0, blue: 0, alpha: 0
+# transparent/opaque
+build "transparent.gif", transparent: true
+build "opaque.gif",      red: 0, green: 0, blue: 0
 
 # 8x8
 build '4x4.gif', 4.times.map { |y|
