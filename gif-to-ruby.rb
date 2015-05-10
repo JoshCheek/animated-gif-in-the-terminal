@@ -168,7 +168,7 @@ end
 
 if $0 !~ /rspec/
   gifdata = File.read(ARGV[0])
-  puts ConsoleGif::Animation.new(gifdata, :small).to_rb
+  puts ConsoleGif::Animation.new(gifdata, :sharp).to_rb
 else
   RSpec.describe ConsoleGif do
     def fixture_path(basename)
@@ -340,9 +340,10 @@ else
           .to eq File.read(fixture_path 'owl-small.rb')
       end
 
-      example 'sharp image'
-        # expect(animation_for('owl.gif', style: :sharp).to_rb)
-        #   .to eq File.read(fixture_path, 'whatev')
+      example 'sharp image' do
+        expect(animation_for('owl.gif', style: :sharp).to_rb)
+          .to eq File.read(fixture_path 'owl-sharp.rb')
+      end
 
       specify 'animated image has a 0.1s delay between frames'
       it 'hides the cursor at the beginning and shows it at the end'
