@@ -55,8 +55,8 @@ build "transparent.gif", red: 0, green: 0, blue: 0, alpha: 1
 build "opaque.gif",      red: 0, green: 0, blue: 0, alpha: 0
 
 # 8x8
-build '8x8.gif', 8.times.map { |y|
-  8.times.map { |x| {red: 4, green: x, blue: x+y} }
+build '4x4.gif', 4.times.map { |y|
+  4.times.map { |x| {red: y*43, green: x*43, blue: 0} }
 }
 
 # 2x2 for 2 frames

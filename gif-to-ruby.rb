@@ -61,15 +61,15 @@ module ConsoleGif
 
 
   class CondensedPixel
-    attr_accessor :top_pixel, :bottom_pixel
+    attr_accessor :top, :bottom
 
     def initialize(top_pixel, bottom_pixel)
-      self.top_pixel, self.bottom_pixel = top_pixel, bottom_pixel
+      self.top, self.bottom = top_pixel, bottom_pixel
     end
 
     def to_ansi
-      color_on  = "\e[#{top_pixel.fg_ansi_colour}#{bottom_pixel.bg_ansi_colour}m"
-      color_off = "\e[#{top_pixel.fg_off        }#{bottom_pixel.bg_off        }m"
+      color_on  = "\e[#{top.fg_ansi_colour}#{bottom.bg_ansi_colour}m"
+      color_off = "\e[#{top.fg_off        }#{bottom.bg_off        }m"
       "#{color_on}#{character}#{color_off}"
     end
 
@@ -256,25 +256,36 @@ else
     end
 
     context 'when style is small' do
+      let(:animation) { animation_for '4x4.gif', style: :small }
+      let(:pixels)    { animation.ansi_frames[0].flatten }
+      let(:pixel1)    { pixels.first }
+      let(:tpixels)   { pixels.map &:top }
+      let(:bpixels)   { pixels.map &:bottom }
+
       it 'groups each two rows of pixels together' do
-        anim = animation_for '4x4.gif', style: :small
-
-        tpixels = anim.ansi_frames[0].flat_map do |pixels|
-          pixels.map &:top_pixel
-        end
         expect(tpixels.map &:red).to   eq [0, 0, 0, 0, 2, 2, 2, 2]
-        expect(tpixels.map &:green).to eq [0, 1, 2, 3, 0, 1, 2, 3]
-
-        bpixels = anim.ansi_frames[0].flat_map do |pixels|
-          pixels.map &:bottom_pixel
-        end
         expect(bpixels.map &:red).to   eq [1, 1, 1, 1, 3, 3, 3, 3]
+
+        expect(tpixels.map &:green).to eq [0, 1, 2, 3, 0, 1, 2, 3]
         expect(bpixels.map &:green).to eq [0, 1, 2, 3, 0, 1, 2, 3]
       end
 
-      it 'uses a square for the top row, and leaves the bottom row blank'
-      it 'uses the top pixel\'s foreground colour and the bottom pixel\'s background colour'
-      it 'reuses the last row, if it is not even'
+      it 'uses a square for the top row, and leaves the bottom row blank' do
+        expect(pixels.first.character).to eq '▀'
+      end
+
+      it 'uses the top pixel\'s foreground colour and the bottom pixel\'s background colour' do
+        expect(pixel1.to_ansi).to     include pixel1.top.fg_ansi_colour
+        expect(pixel1.to_ansi).to_not include pixel1.bottom.fg_ansi_colour
+
+        expect(pixel1.to_ansi).to     include pixel1.bottom.bg_ansi_colour
+        expect(pixel1.to_ansi).to_not include pixel1.top.bg_ansi_colour
+      end
+
+      it 'reuses the last row, if it is not even' do
+        pixel = animation_for('red000.gif').ansi_frames[0][0][0]
+        expect(pixel.top).to equal pixel.bottom
+      end
     end
 
     context 'when style is sharp' do
