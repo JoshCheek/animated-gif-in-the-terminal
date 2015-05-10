@@ -78,8 +78,8 @@ module ConsoleGif
     end
 
     def to_ansi
-      color_on  = "\e[#{top.fg_ansi_colour}#{bottom.bg_ansi_colour}m"
-      color_off = "\e[#{top.fg_off        }#{bottom.bg_off        }m"
+      color_on  = "\e[#{top.fg_ansi_colour};#{bottom.bg_ansi_colour}m"
+      color_off = "\e[#{top.fg_off        };#{bottom.bg_off        }m"
       "#{color_on}#{character}#{color_off}"
     end
 
@@ -135,9 +135,7 @@ module ConsoleGif
       compressed_frames = ansi_frames.map { |rows|
         frame = rows.map { |pixels| pixels.map &:to_ansi }
                     .map(&:join)
-                    .map(&:inspect)
-          .join()
-                    # .join(",   \n")
+                    .join("\n")
         Zlib::Deflate.deflate(frame)
       }
 
@@ -146,7 +144,8 @@ module ConsoleGif
       show_cursor = "\e[?25h".inspect
       <<-PROGRAM.gsub(/^ {8}/, '')
         require 'zlib'
-        frames = [#{compressed_frames.join}]
+        frames = [#{compressed_frames.map(&:inspect).join(",\n  ")}
+        ]
         begin
           print #{clear}#{hide_cursor}
           frames.each.with_index 1 do |frame, nxt|
@@ -154,6 +153,7 @@ module ConsoleGif
             sleep 0.1
             print #{clear} if frames[nxt]
           end
+          puts
         ensure
           print #{show_cursor}
         end
