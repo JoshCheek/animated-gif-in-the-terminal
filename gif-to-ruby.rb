@@ -144,15 +144,18 @@ end
 if $0 !~ /rspec/
 else
   RSpec.describe ConsoleGif do
+    def animation_for(fixture_filename)
+      fixture_filepath = File.join __dir__, 'fixtures', fixture_filename
+      gifdata          = File.read(fixture_filepath)
+      ConsoleGif::Animation.new(gifdata, :small)
+    end
+
     describe 'color conversion' do
       def assert_first_pixel(fixture_filename, assertions)
-        fixture_filepath = File.join __dir__, 'fixtures', fixture_filename
-        gifdata          = File.read(fixture_filepath)
-        animation        = ConsoleGif::Animation.new(gifdata, :small)
-        first_frame      = animation.frames.first
-        first_row        = first_frame.first
-        first_pixel      = first_row.first
-        assert_pixel first_pixel, assertions, "first pixel of #{fixture_filepath.inspect}"
+        animation = animation_for fixture_filename
+        frame     = animation.frames.first
+        row       = frame.first
+        assert_pixel row.first, assertions, "first pixel of #{fixture_filename.inspect}"
       end
 
       def assert_pixel(pixel, assertions, description)
@@ -230,9 +233,12 @@ else
       end
     end
 
-    describe 'frames' do
-      it 'identifies and distinguishes each frame'
-      it 'places the pixel at the correct position within the frame'
+    it 'identifies and distinguishes each frame' do
+      amt_red = animation_for('2x2x2.gif').frames.map { |fr| fr.map { |row| row.map &:red } }
+      expect(amt_red).to eq [
+        [[0, 1], [2, 3]], # frame1
+        [[5, 4], [3, 2]], # frame 2
+      ]
     end
 
     context 'when style is small' do
