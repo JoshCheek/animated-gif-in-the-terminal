@@ -38,7 +38,7 @@ module ConsoleGif
     end
 
     def to_ansi
-      "\e[#{bg_ansi_colour}m  \e[#{bg_off}m"
+      "\e[#{bg_ansi_colour}m#{character}\e[#{bg_off}m"
     end
 
     def fg_ansi_colour
@@ -50,6 +50,10 @@ module ConsoleGif
     end
 
     alias opaque? opaque
+
+    def character
+      '  '
+    end
 
     def ansi_color
       offset = 16 # I think these are for the system colors (30-37, 90-97)
@@ -106,7 +110,10 @@ module ConsoleGif
 
     def ansi_frames
       @ansi_frames ||= begin
-        if style == :small
+        case style
+        when :sharp
+          frames
+        when :small
           self.frames.map do |rows|
             rows = [*rows, rows.last] if rows.length.odd?
             rows.each_slice(2).map do |slice|
@@ -114,7 +121,7 @@ module ConsoleGif
             end
           end
         else
-          raise 'wat'
+          raise "Unknown style: #{style.inspect}"
         end
       end
     end
@@ -289,9 +296,33 @@ else
     end
 
     context 'when style is sharp' do
-      it 'does not group pixels together'
-      it 'uses 2 spaces for the pixel'
-      it 'uses the pixel\'s background colour'
+      let(:animation) { animation_for '4x4.gif', style: :sharp }
+      let(:pixels)    { animation.ansi_frames[0].flatten }
+      let(:pixel1)    { pixels.first }
+
+      it 'does not group pixels together' do
+        expect(pixels.map &:red).to eq [
+          0, 0, 0, 0,
+          1, 1, 1, 1,
+          2, 2, 2, 2,
+          3, 3, 3, 3,
+        ]
+        expect(pixels.map &:green).to eq [
+          0, 1, 2, 3,
+          0, 1, 2, 3,
+          0, 1, 2, 3,
+          0, 1, 2, 3,
+        ]
+      end
+
+      it 'uses 2 spaces for the pixel' do
+        expect(pixel1.character).to eq '  '
+      end
+
+      it 'uses the pixel\'s background colour' do
+        expect(pixel1.to_ansi).to     include pixel1.bg_ansi_colour
+        expect(pixel1.to_ansi).to_not include pixel1.fg_ansi_colour
+      end
     end
 
     context 'integration' do
