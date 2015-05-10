@@ -59,6 +59,7 @@ module ConsoleGif
     end
   end
 
+
   class CondensedPixel
     attr_accessor :top_pixel, :bottom_pixel
 
@@ -103,16 +104,28 @@ module ConsoleGif
       end
     end
 
+    def ansi_frames
+      @ansi_frames ||= begin
+        if style == :small
+          self.frames.map do |rows|
+            rows = [*rows, rows.last] if rows.length.odd?
+            rows.each_slice(2).map do |slice|
+              slice.transpose.map { |pair| CondensedPixel.new *pair }
+            end
+          end
+        else
+          raise 'wat'
+        end
+      end
+    end
+
     def to_rb
-          # rows << rows.first.map { Pixel.new 0, 0, 0, false } if rows.length.odd?
-          # ansi_frame = rows.each_slice(2)
-          #                  .map(&:transpose)
-          #                  .map { |pairs|
-          #                    pairs.map { |top, bottom| "\e[#{top.to_s true};#{bottom.to_s false}m#{top.opaque? ? '▀' : ' '}\e[0m" }.join
-          #                  }
-          #                  .join("\n")
-          # ansi_frames << ansi_frame
-        # }
+  # rows << rows.first.map { Pixel.new 0, 0, 0, false } if rows.length.odd?
+  # ansi_frame = rows.each_slice(2)
+  #                  .map(&:transpose)
+  #                  .join("\n")
+  # ansi_frames << ansi_frame
+# }
 
       compressed_frames = ansi_frames.map { |frame| Zlib::Deflate.deflate frame }
       clear             = "\e[H\e[2J".inspect
@@ -144,15 +157,15 @@ end
 if $0 !~ /rspec/
 else
   RSpec.describe ConsoleGif do
-    def animation_for(fixture_filename)
+    def animation_for(fixture_filename, style: :small)
       fixture_filepath = File.join __dir__, 'fixtures', fixture_filename
       gifdata          = File.read(fixture_filepath)
-      ConsoleGif::Animation.new(gifdata, :small)
+      ConsoleGif::Animation.new(gifdata, style)
     end
 
     describe 'color conversion' do
-      def assert_first_pixel(fixture_filename, assertions)
-        animation = animation_for fixture_filename
+      def assert_first_pixel(fixture_filename, assertions, style: :small)
+        animation = animation_for fixture_filename, style: style
         frame     = animation.frames.first
         row       = frame.first
         assert_pixel row.first, assertions, "first pixel of #{fixture_filename.inspect}"
@@ -228,6 +241,7 @@ else
 
       it 'knows whether the pixel is tansparent or opaque' do
         pending 'not sure whether implementation or test is correct'
+        # TODO: double check this is testing what we think it is
         assert_first_pixel 'opaque.gif',      opaque: true,  transparent: false
         assert_first_pixel 'transparent.gif', opaque: false, transparent: true
       end
@@ -242,9 +256,25 @@ else
     end
 
     context 'when style is small' do
-      it 'groups each two rows of pixels together'
+      it 'groups each two rows of pixels together' do
+        anim = animation_for '4x4.gif', style: :small
+
+        tpixels = anim.ansi_frames[0].flat_map do |pixels|
+          pixels.map &:top_pixel
+        end
+        expect(tpixels.map &:red).to   eq [0, 0, 0, 0, 2, 2, 2, 2]
+        expect(tpixels.map &:green).to eq [0, 1, 2, 3, 0, 1, 2, 3]
+
+        bpixels = anim.ansi_frames[0].flat_map do |pixels|
+          pixels.map &:bottom_pixel
+        end
+        expect(bpixels.map &:red).to   eq [1, 1, 1, 1, 3, 3, 3, 3]
+        expect(bpixels.map &:green).to eq [0, 1, 2, 3, 0, 1, 2, 3]
+      end
+
       it 'uses a square for the top row, and leaves the bottom row blank'
       it 'uses the top pixel\'s foreground colour and the bottom pixel\'s background colour'
+      it 'reuses the last row, if it is not even'
     end
 
     context 'when style is sharp' do
