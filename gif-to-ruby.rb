@@ -4,22 +4,34 @@ require 'rmagick'
 module ConsoleGif
   module Binary
     def self.call(argv, instream, outstream, errstream)
-      parsed      = parse argv, default_out: outstream, default_in: instream
-      style       = parsed.fetch :style
+      parsed = parse argv, default_out: outstream, default_in: instream
+      errors = parsed.fetch :errors
 
+      if errors.any?
+        errors.each { |error| errstream.puts error }
+        return false
+      end
+
+      style       = parsed.fetch :style
       output_file = parsed.fetch :output_file
       input_file  = parsed.fetch :input_file
       gifdata     = (input_file.respond_to?(:read) ? input_file.read : File.read(input_file))
+      print       = lambda { |stream| ConsoleGif::Animation.new(gifdata, style).to_rb(stream) }
 
       if output_file.respond_to? :write
-        ConsoleGif::Animation.new(gifdata, style).to_rb(output_file)
+        print.call output_file
       else
-        File.open(output_file, 'w') do |file|
-          ConsoleGif::Animation.new(gifdata, style).to_rb(file)
-        end
+        File.open(output_file, 'w', &print)
       end
 
       true
+    rescue Errno::ENOENT => e
+      errstream.puts e.message
+      return false
+    rescue Magick::ImageMagickError => e
+      errstream.puts "Double check that input is a gif, ImageMagick raised this error:"
+      errstream.puts e.message
+      return false
     end
 
     def self.parse(args, defaults)
@@ -235,7 +247,7 @@ end
 
 
 if $0 !~ /rspec/
-  exit ConsoleGif::Binary.call(ARGV, $stdin, $stdout, $stdin)
+  exit ConsoleGif::Binary.call(ARGV, $stdin, $stdout, $stderr)
 else
   RSpec.describe ConsoleGif do
     def fixture_path(basename)
@@ -377,7 +389,7 @@ else
             expect(filebody).to eq printed # same thing winds up in both
           end
 
-          it 'can read from stdin or a file', t:true do
+          it 'can read from stdin or a file' do
             gifdata    = File.read fixture_path 'red000.gif'
             outstream1 = StringIO.new
             outstream2 = StringIO.new
@@ -395,31 +407,36 @@ else
         end
 
         context 'when there is an error' do
-          xit 'prints errors to the error stream' do
+          it 'prints errors to the error stream' do
             multiple_infile_err = parse(['a', 'b'])[:errors].fetch(0)
             stderr              = StringIO.new
             call ['a', 'b'], stderr: stderr
-            expect(stderr.string).to include multiple_infile_err
+            expect(stderr.string.chomp).to eq multiple_infile_err
           end
 
-          xit 'returns false' do
+          it 'returns false' do
             expect(call ['a', 'b']).to eq false
           end
         end
 
-        xit 'prints an error when the input file DNE' do
+        it 'prints an error when the input file DNE' do
           stderr = StringIO.new
           expect(call ['not/a/file'], stderr: stderr).to eq false
           expect(stderr.string).to include 'not/a/file'
         end
 
-        xit 'prints an error when the output file DNE' do
+        it 'prints an error when the output file DNE' do
           stderr = StringIO.new
           expect(call ['-o', 'not/a/file'], stderr: stderr).to eq false
           expect(stderr.string).to include 'not/a/file'
         end
 
-        xit 'prints an error when the input file isn\'t a gif'
+        it 'prints an error when the input file isn\'t a gif' do
+          stdin  = StringIO.new 'random giberish'
+          stderr = StringIO.new
+          expect(call ['-', '-o', '-'], stdin: stdin, stderr: stderr).to eq false
+          expect(stderr.string).to match /input is a gif/i
+        end
       end
     end
 
