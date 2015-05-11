@@ -3,12 +3,34 @@ require 'rmagick'
 
 module ConsoleGif
   module Binary
+    def self.call(argv, instream, outstream, errstream)
+      parsed      = parse argv, default_out: outstream, default_in: instream
+      style       = parsed.fetch :style
+
+      output_file = parsed.fetch :output_file
+      input_file  = parsed.fetch :input_file
+      gifdata     = (input_file.respond_to?(:read) ? input_file.read : File.read(input_file))
+
+      if output_file.respond_to? :write
+        ConsoleGif::Animation.new(gifdata, style).to_rb(output_file)
+      else
+        File.open(output_file, 'w') do |file|
+          ConsoleGif::Animation.new(gifdata, style).to_rb(file)
+        end
+      end
+
+      true
+    end
+
     def self.parse(args, defaults)
+      default_out = defaults.fetch :default_out
+      default_in  = defaults.fetch :default_in
+
       parsed = {
         errors:         [],
         style:          :small,
-        output_file:    defaults[:default_out],
-        input_file:     defaults[:default_in],
+        output_file:    default_out,
+        input_file:     default_in,
         print_help:     false,
         filenames_seen: [],
       }
@@ -177,7 +199,7 @@ module ConsoleGif
       end
     end
 
-    def to_rb
+    def to_rb(outfile='')
       compressed_frames = ansi_frames.map { |rows|
         frame = rows.map { |pixels| pixels.map &:to_ansi }
                     .map(&:join)
@@ -188,7 +210,7 @@ module ConsoleGif
       clear       = "\e[H\e[2J".inspect
       hide_cursor = "\e[?25l".inspect
       show_cursor = "\e[?25h".inspect
-      <<-PROGRAM.gsub(/^ {8}/, '')
+      outfile << <<-PROGRAM.gsub(/^ {8}/, '')
         require 'zlib'
         frames = [#{compressed_frames.map(&:inspect).join(",\n  ")}
         ]
@@ -213,8 +235,7 @@ end
 
 
 if $0 !~ /rspec/
-  gifdata = File.read(ARGV[0])
-  puts ConsoleGif::Animation.new(gifdata, :sharp).to_rb
+  exit ConsoleGif::Binary.call(ARGV, $stdin, $stdout, $stdin)
 else
   RSpec.describe ConsoleGif do
     def fixture_path(basename)
@@ -225,6 +246,181 @@ else
       fixture_filepath = fixture_path fixture_filename
       gifdata          = File.read(fixture_filepath)
       ConsoleGif::Animation.new(gifdata, style)
+    end
+
+    describe 'Binary' do
+      def parse(args, defaults={})
+        defaults[:default_out] ||= :default_out
+        defaults[:default_in]  ||= :default_in
+        expect(defaults.length).to eq 2
+        ConsoleGif::Binary.parse(args, defaults)
+      end
+
+      context 'commandline arguments' do
+        it 'doesn\'t mutate the args it parses' do
+          args = ['-s', 'sharp', '-o', 'out', 'in', '-h']
+          parse args
+          expect(args).to eq ['-s', 'sharp', '-o', 'out', 'in', '-h']
+        end
+
+        describe 'style' do
+          it 'can be given a style with -s and --style' do
+            expect(parse(['-s',      'sharp'])[:style]).to eq :sharp
+            expect(parse(['--style', 'sharp'])[:style]).to eq :sharp
+          end
+
+          it 'accepts values of small and sharp' do
+            expect(parse(['-s', 'small'])[:style]).to eq :small
+            expect(parse(['-s', 'sharp'])[:style]).to eq :sharp
+          end
+
+          it 'sets an error if the style is unknown' do
+            expect(parse(['-s', 'small'])[:errors]).to be_empty
+            expect(parse(['-s', 'wat'])[:errors]).to_not be_empty
+          end
+
+          it 'defaults to small' do
+            expect(parse([])[:style]).to eq :small
+          end
+        end
+
+        describe 'output_file' do
+          it 'can be given an output file with -o and --output' do
+            expect(parse(['-o', 'fn'],       default_out: :stdout)[:output_file]).to eq 'fn'
+            expect(parse(['--output', 'fn'], default_out: :stdout)[:output_file]).to eq 'fn'
+          end
+
+          it 'defaults to stdout' do
+            expect(parse([], default_out: :stdout)[:output_file]).to eq :stdout
+          end
+
+          specify 'output file of "-" means stdout' do
+            expect(parse(['-o', '-'], default_out: :stdout)[:output_file]).to eq :stdout
+          end
+
+          it 'sets an error if the output file is not provided' do
+            expect(parse(['-o', 'fn'], default_out: :stdout)[:errors]).to be_empty
+            expect(parse(['-o'],       default_out: :stdout)[:errors]).to_not be_empty
+          end
+        end
+
+        describe 'input_file' do
+          it 'is the first non-flag/arg' do
+            expect(parse(['infile'], default_in: :stdin)[:input_file]).to eq 'infile'
+          end
+
+          it 'sets an error if given multiple input files' do
+            expect(parse(['f1'],                        default_in: :stdin)[:errors]).to be_empty
+            expect(parse(['f1'],                        default_in: :stdin)[:errors]).to be_empty
+            expect(parse(['f1', 'f2'],                  default_in: :stdin)[:errors]).to_not be_empty
+            expect(parse(['a', '-'],                    default_in: :stdin)[:errors]).to_not be_empty
+            expect(parse(['-', 'a'],                    default_in: :stdin)[:errors]).to_not be_empty
+            expect(parse(['f1', 'f2', '-o', '-', 'f3'], default_in: :stdin)[:filenames_seen])
+                  .to eq ['f1', 'f2',            'f3']
+          end
+
+          specify 'input file of "-" means stdin' do
+            expect(parse(['-'], default_in: :stdin)[:input_file]).to eq :stdin
+            expect(parse(['-'], default_in: :stdin)[:errors]).to be_empty
+          end
+
+          it 'defaults to "-" if the input file is not provided' do
+            expect(parse([], default_in: :stdin)[:input_file]).to eq :stdin
+          end
+        end
+
+        describe 'print_help' do
+          it 'can be told to print help with "-h" and "--help"' do
+            expect(parse([])[:print_help]).to eq false
+            expect(parse(['-h'])[:print_help]).to eq true
+            expect(parse(['--help'])[:print_help]).to eq true
+          end
+        end
+      end
+
+      describe '.call' do
+        require 'stringio'
+        def call(argv, stdin:StringIO.new, stdout:StringIO.new, stderr:StringIO.new)
+          ConsoleGif::Binary.call argv, stdin, stdout, stderr
+        end
+
+        require 'tempfile'
+        def with_tmpfile(&block)
+          Tempfile.open 'animated-gif-terminal' do |file|
+            yield file
+            File.read file.path
+          end
+        end
+
+        context 'when there are no errors' do
+          it 'parses the args, reads the data, writes the ruby, and returns true' do
+            stdin, stdout, stderr = StringIO.new('original-stdin'), StringIO.new, StringIO.new
+            success = call ['-s', 'sharp', fixture_path('red000.gif'), '-o', '-'], stdin: stdin, stdout: stdout, stderr: stderr
+            expect(stdin.read).to eq 'original-stdin' # was not read
+            expect(stderr.string).to be_empty
+            expect(stdout.string).to eq animation_for('red000.gif', style: :sharp).to_rb
+            expect(success).to eq true
+          end
+
+          it 'can write to stdout or a file' do
+            outstream = StringIO.new
+            call [fixture_path('red000.gif'), '-o', '-'], stdout: outstream
+            printed = outstream.string
+            expect(outstream.string).to_not be_empty
+
+            filebody = with_tmpfile do |file|
+              outstream = StringIO.new
+              call [fixture_path('red000.gif'), '-o', file.path], stdout: outstream
+              expect(outstream.string).to be_empty
+            end
+
+            expect(filebody).to eq printed # same thing winds up in both
+          end
+
+          it 'can read from stdin or a file', t:true do
+            gifdata    = File.read fixture_path 'red000.gif'
+            outstream1 = StringIO.new
+            outstream2 = StringIO.new
+            instream1  = StringIO.new gifdata
+            instream2  = StringIO.new gifdata
+
+            call ['-', '-o', '-'], stdin: instream1, stdout: outstream1
+            expect(instream1.read).to be_empty
+
+            call [fixture_path('red000.gif'), '-o', '-'], stdin: instream2, stdout: outstream2
+            expect(instream2.read).to eq gifdata
+
+            expect(outstream1.string).to eq outstream2.string
+          end
+        end
+
+        context 'when there is an error' do
+          xit 'prints errors to the error stream' do
+            multiple_infile_err = parse(['a', 'b'])[:errors].fetch(0)
+            stderr              = StringIO.new
+            call ['a', 'b'], stderr: stderr
+            expect(stderr.string).to include multiple_infile_err
+          end
+
+          xit 'returns false' do
+            expect(call ['a', 'b']).to eq false
+          end
+        end
+
+        xit 'prints an error when the input file DNE' do
+          stderr = StringIO.new
+          expect(call ['not/a/file'], stderr: stderr).to eq false
+          expect(stderr.string).to include 'not/a/file'
+        end
+
+        xit 'prints an error when the output file DNE' do
+          stderr = StringIO.new
+          expect(call ['-o', 'not/a/file'], stderr: stderr).to eq false
+          expect(stderr.string).to include 'not/a/file'
+        end
+
+        xit 'prints an error when the input file isn\'t a gif'
+      end
     end
 
     describe 'color conversion' do
@@ -377,91 +573,6 @@ else
       it 'uses the pixel\'s background colour' do
         expect(pixel1.to_ansi).to     include pixel1.bg_ansi_colour
         expect(pixel1.to_ansi).to_not include pixel1.fg_ansi_colour
-      end
-    end
-
-
-    context 'commandline arguments' do
-      def parse(args, defaults={})
-        ConsoleGif::Binary.parse(args, defaults)
-      end
-
-      it 'doesn\'t mutate the args it parses' do
-        args = ['-s', 'sharp', '-o', 'out', 'in', '-h']
-        parse args
-        expect(args).to eq ['-s', 'sharp', '-o', 'out', 'in', '-h']
-      end
-
-      describe 'style' do
-        it 'can be given a style with -s and --style' do
-          expect(parse(['-s',      'sharp'])[:style]).to eq :sharp
-          expect(parse(['--style', 'sharp'])[:style]).to eq :sharp
-        end
-
-        it 'accepts values of small and sharp' do
-          expect(parse(['-s', 'small'])[:style]).to eq :small
-          expect(parse(['-s', 'sharp'])[:style]).to eq :sharp
-        end
-
-        it 'sets an error if the style is unknown' do
-          expect(parse(['-s', 'small'])[:errors]).to be_empty
-          expect(parse(['-s', 'wat'])[:errors]).to_not be_empty
-        end
-
-        it 'defaults to small' do
-          expect(parse([])[:style]).to eq :small
-        end
-      end
-
-      describe 'output_file' do
-        it 'can be given an output file with -o and --output' do
-          expect(parse(['-o', 'fn'],       default_out: :stdout)[:output_file]).to eq 'fn'
-          expect(parse(['--output', 'fn'], default_out: :stdout)[:output_file]).to eq 'fn'
-        end
-
-        it 'defaults to stdout' do
-          expect(parse([], default_out: :stdout)[:output_file]).to eq :stdout
-        end
-
-        specify 'output file of "-" means stdout' do
-          expect(parse(['-o', '-'], default_out: :stdout)[:output_file]).to eq :stdout
-        end
-
-        it 'sets an error if the output file is not provided' do
-          expect(parse(['-o', 'fn'], default_out: :stdout)[:errors]).to be_empty
-          expect(parse(['-o'],       default_out: :stdout)[:errors]).to_not be_empty
-        end
-      end
-
-      describe 'input_file' do
-        it 'is the first non-flag/arg' do
-          expect(parse(['infile'], default_in: :stdin)[:input_file]).to eq 'infile'
-        end
-
-        it 'sets an error if given multiple input files' do
-          expect(parse(['f1'],                        default_in: :stdin)[:errors]).to be_empty
-          expect(parse(['f1'],                        default_in: :stdin)[:errors]).to be_empty
-          expect(parse(['f1', 'f2'],                  default_in: :stdin)[:errors]).to_not be_empty
-          expect(parse(['f1', 'f2', '-o', '-', 'f3'], default_in: :stdin)[:filenames_seen])
-                .to eq ['f1', 'f2',            'f3']
-        end
-
-        specify 'input file of "-" means stdin' do
-          expect(parse(['-'], default_in: :stdin)[:input_file]).to eq :stdin
-          expect(parse(['-'], default_in: :stdin)[:errors]).to be_empty
-        end
-
-        it 'defaults to "-" if the input file is not provided' do
-          expect(parse([], default_in: :stdin)[:input_file]).to eq :stdin
-        end
-      end
-
-      describe 'print_help' do
-        it 'can be told to print help with "-h" and "--help"' do
-          expect(parse([])[:print_help]).to eq false
-          expect(parse(['-h'])[:print_help]).to eq true
-          expect(parse(['--help'])[:print_help]).to eq true
-        end
       end
     end
 
