@@ -12,19 +12,12 @@ module ConsoleGif
         return false
       end
 
-      style       = parsed.fetch :style
       output_file = parsed.fetch :output_file
       input_file  = parsed.fetch :input_file
       gifdata     = (input_file.respond_to?(:read) ? input_file.read : File.read(input_file))
-      print       = lambda { |stream| ConsoleGif::Animation.new(gifdata, style).to_rb(stream) }
-
-      if output_file.respond_to? :write
-        print.call output_file
-      else
-        File.open(output_file, 'w', &print)
-      end
-
-      true
+      print       = lambda { |stream| ConsoleGif::Animation.new(gifdata, parsed.fetch(:style)).to_rb(stream) }
+      output_file.respond_to?(:write) ? print.call(output_file) : File.open(output_file, 'w', &print)
+      return true
     rescue Errno::ENOENT => e
       errstream.puts e.message
       return false
@@ -35,19 +28,18 @@ module ConsoleGif
     end
 
     def self.parse(args, defaults)
+      args        = args.dup
       default_out = defaults.fetch :default_out
       default_in  = defaults.fetch :default_in
-
-      parsed = {
+      parsed      = {
         errors:         [],
+        filenames_seen: [],
         style:          :small,
+        print_help:     false,
         output_file:    default_out,
         input_file:     default_in,
-        print_help:     false,
-        filenames_seen: [],
       }
 
-      args = args.dup
       until args.empty?
         arg = args.shift
         case arg
@@ -75,7 +67,7 @@ module ConsoleGif
         end
       end
 
-      if 1 < parsed[:filenames_seen].length
+      if 2 <= parsed[:filenames_seen].length
         parsed[:errors] << "Can only process one filename, but saw: #{parsed[:filenames_seen].map(&:inspect).join(', ')}"
       end
 
