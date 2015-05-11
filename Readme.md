@@ -17,15 +17,24 @@ Install
 -------
 
 ```sh
-$ brew install imagemagick
-$ bundle
+$ brew install imagemagick               # C dependency for reading gifs
+$ bundle                                 # Get the Ruby dependencies
+$ rspec                                  # Run the tests
+$ bin/gif2rb examples/nyan.gif | ruby -  # Run the binary
 ```
 
 Run
 ---
 
 ```sh
-$ sh run.sh
+# see all options
+$ bin/gif2rb -h
+
+# run the owl
+$ bin/gif2rb examples/owl.gif | ruby -
+
+# run the kitten with highest quality pixels
+$ bin/gif2rb examples/kitten.gif -s sharp | ruby -
 ```
 
 Steal
