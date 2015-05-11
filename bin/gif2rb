@@ -1,0 +1,4 @@
+#!/usr/bin/env ruby
+$LOAD_PATH.unshift File.expand_path('../lib', __dir__)
+require 'console_gif/binary'
+exit ConsoleGif::Binary.call(ARGV, $stdin, $stdout, $stderr)
