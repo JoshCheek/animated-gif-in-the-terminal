@@ -352,8 +352,8 @@ else
 
       describe '.call' do
         require 'stringio'
-        def call(argv, stdin:StringIO.new, stdout:StringIO.new, stderr:StringIO.new)
-          ConsoleGif::Binary.call argv, stdin, stdout, stderr
+        def call(argv, instream:StringIO.new, outstream:StringIO.new, errstream:StringIO.new)
+          ConsoleGif::Binary.call argv, instream, outstream, errstream
         end
 
         require 'tempfile'
@@ -366,40 +366,40 @@ else
 
         context 'when there are no errors' do
           it 'parses the args, reads the data, writes the ruby, and returns true' do
-            stdin, stdout, stderr = StringIO.new('original-stdin'), StringIO.new, StringIO.new
-            success = call ['-s', 'sharp', fixture_path('red000.gif'), '-o', '-'], stdin: stdin, stdout: stdout, stderr: stderr
-            expect(stdin.read).to eq 'original-stdin' # was not read
-            expect(stderr.string).to be_empty
-            expect(stdout.string).to eq animation_for('red000.gif', style: :sharp).to_rb
+            instream, outstream, errstream = StringIO.new('original-instream'), StringIO.new, StringIO.new
+            success = call ['-s', 'sharp', fixture_path('red000.gif'), '-o', '-'], instream: instream, outstream: outstream, errstream: errstream
+            expect(instream.read).to eq 'original-instream' # was not read
+            expect(errstream.string).to be_empty
+            expect(outstream.string).to eq animation_for('red000.gif', style: :sharp).to_rb
             expect(success).to eq true
           end
 
-          it 'can write to stdout or a file' do
+          it 'can write to outstream or a file' do
             outstream = StringIO.new
-            call [fixture_path('red000.gif'), '-o', '-'], stdout: outstream
+            call [fixture_path('red000.gif'), '-o', '-'], outstream: outstream
             printed = outstream.string
             expect(outstream.string).to_not be_empty
 
             filebody = with_tmpfile do |file|
               outstream = StringIO.new
-              call [fixture_path('red000.gif'), '-o', file.path], stdout: outstream
+              call [fixture_path('red000.gif'), '-o', file.path], outstream: outstream
               expect(outstream.string).to be_empty
             end
 
             expect(filebody).to eq printed # same thing winds up in both
           end
 
-          it 'can read from stdin or a file' do
+          it 'can read from instream or a file' do
             gifdata    = File.read fixture_path 'red000.gif'
             outstream1 = StringIO.new
             outstream2 = StringIO.new
             instream1  = StringIO.new gifdata
             instream2  = StringIO.new gifdata
 
-            call ['-', '-o', '-'], stdin: instream1, stdout: outstream1
+            call ['-', '-o', '-'], instream: instream1, outstream: outstream1
             expect(instream1.read).to be_empty
 
-            call [fixture_path('red000.gif'), '-o', '-'], stdin: instream2, stdout: outstream2
+            call [fixture_path('red000.gif'), '-o', '-'], instream: instream2, outstream: outstream2
             expect(instream2.read).to eq gifdata
 
             expect(outstream1.string).to eq outstream2.string
@@ -409,9 +409,9 @@ else
         context 'when there is an error' do
           it 'prints errors to the error stream' do
             multiple_infile_err = parse(['a', 'b'])[:errors].fetch(0)
-            stderr              = StringIO.new
-            call ['a', 'b'], stderr: stderr
-            expect(stderr.string.chomp).to eq multiple_infile_err
+            errstream           = StringIO.new
+            call ['a', 'b'], errstream: errstream
+            expect(errstream.string.chomp).to eq multiple_infile_err
           end
 
           it 'returns false' do
@@ -420,22 +420,22 @@ else
         end
 
         it 'prints an error when the input file DNE' do
-          stderr = StringIO.new
-          expect(call ['not/a/file'], stderr: stderr).to eq false
-          expect(stderr.string).to include 'not/a/file'
+          errstream = StringIO.new
+          expect(call ['not/a/file'], errstream: errstream).to eq false
+          expect(errstream.string).to include 'not/a/file'
         end
 
         it 'prints an error when the output file DNE' do
-          stderr = StringIO.new
-          expect(call ['-o', 'not/a/file'], stderr: stderr).to eq false
-          expect(stderr.string).to include 'not/a/file'
+          errstream = StringIO.new
+          expect(call ['-o', 'not/a/file'], errstream: errstream).to eq false
+          expect(errstream.string).to include 'not/a/file'
         end
 
         it 'prints an error when the input file isn\'t a gif' do
-          stdin  = StringIO.new 'random giberish'
-          stderr = StringIO.new
-          expect(call ['-', '-o', '-'], stdin: stdin, stderr: stderr).to eq false
-          expect(stderr.string).to match /input is a gif/i
+          instream  = StringIO.new 'random giberish'
+          errstream = StringIO.new
+          expect(call ['-', '-o', '-'], instream: instream, errstream: errstream).to eq false
+          expect(errstream.string).to match /input is a gif/i
         end
       end
     end
