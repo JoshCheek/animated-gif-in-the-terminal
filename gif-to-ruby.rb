@@ -5,8 +5,13 @@ module ConsoleGif
   module Binary
     def self.call(argv, instream, outstream, errstream)
       parsed = parse argv, default_out: outstream, default_in: instream
-      errors = parsed.fetch :errors
 
+      if parsed.fetch :print_help
+        outstream.puts DATA.read
+        return true
+      end
+
+      errors = parsed.fetch :errors
       if errors.any?
         errors.each { |error| errstream.puts error }
         return false
@@ -429,6 +434,12 @@ else
           expect(call ['-', '-o', '-'], instream: instream, errstream: errstream).to eq false
           expect(errstream.string).to match /input is a gif/i
         end
+
+        it 'prints help when told to' do
+          outstream = StringIO.new
+          expect(call ['-h'], outstream: outstream).to eq true
+          expect(outstream.string).to match /usage/i
+        end
       end
     end
 
@@ -604,3 +615,38 @@ else
     end
   end
 end
+
+__END__
+Usage: ruby gif-to-ruby.rb [options]
+
+Synopsis:
+  Emits Ruby code that will play an animated gif in the terminal
+
+Options:
+  -h --help             # This help screen
+
+  -s --style STYLE      # Set the output style (STYLE must be either "small", or "sharp")
+                        # Default is "small"
+                        #
+                        # Small: Consolidates two rows of pixels into one character.
+                        #        Advantage is that it is half as wide and half as tall, so fits better in the terminal.
+                        #
+                        # Sharp: Each pixel is two spaces with the background set.
+                        #        Advantage is that it looks much better, as the 2-pixel representation
+                        #        leaves a border around the top pixel.
+
+  -o --output FILENAME  # Provide a file name to write the resulting Ruby program to.
+                        # Stnadard output is the default
+                        # A filename of "-" will explicitly set it to stdout.
+
+  FILENAME              # A non-flag will be considered an input filename.
+                        # It should be a valid gif file
+                        # The default is Standard input
+                        # A filename of "-" will explicitly set it to stdin
+
+Example output:
+  $ curl -sL http://bit.ly/1DRCK7q | ruby -
+
+Example invocation:
+  $ ruby gif-to-ruby.rb fixtures/owl.gif -s sharp -o - | ruby -
+
