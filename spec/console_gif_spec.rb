@@ -351,7 +351,7 @@ RSpec.describe ConsoleGif do
   end
 
 
-  context 'integration' do
+  context 'integration', integration: true do
     example 'small image' do
       expect(animation_for('owl.gif', style: :small).to_rb)
         .to eq File.read(fixture_path 'owl-small.rb')

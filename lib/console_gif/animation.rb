@@ -5,12 +5,8 @@ require 'console_gif/condensed_pixel'
 
 module ConsoleGif
   class Animation
-    def initialize(gifdata, style)
-      self.style, self.imagelist = style, Magick::ImageList.new.from_blob(gifdata).coalesce.remap
-    end
-
-    def frames
-      @frames ||= imagelist.to_enum(:each).map do |image| # apparently they overrode #map to do wonky ass shit
+    def self.frames_for(list)
+      list.to_enum(:each).map do |image| # apparently they overrode #map to do wonky ass shit
         image.to_enum(:each_pixel).with_object([]) do |(pixel, x, y), rows|
           rows[y]  ||= Array.new
           rows[y][x] = Pixel.new red:        pixel.red,
@@ -22,22 +18,26 @@ module ConsoleGif
       end
     end
 
-    def ansi_frames
-      @ansi_frames ||= begin
-        case style
-        when :sharp
-          frames
-        when :small
-          self.frames.map do |rows|
-            rows = [*rows, rows.last] if rows.length.odd?
-            rows.each_slice(2).map do |slice|
-              slice.transpose.map { |pair| CondensedPixel.new *pair }
-            end
-          end
-        else
-          raise "Unknown style: #{style.inspect}"
+
+    def self.ansi_frames_for(frames, style)
+      return frames                           if style == :sharp
+      raise "Unknown style: #{style.inspect}" if style != :small
+
+      frames.map do |rows|
+        rows = [*rows, rows.last] if rows.length.odd?
+        rows.each_slice(2).map do |slice|
+          slice.transpose.map { |pair| CondensedPixel.new *pair }
         end
       end
+    end
+
+
+    attr_accessor :style, :imagelist, :frames, :ansi_frames
+    def initialize(gifdata, style)
+      self.style       = style
+      self.imagelist   = Magick::ImageList.new.from_blob(gifdata).coalesce.remap
+      self.frames      = Animation.frames_for imagelist
+      self.ansi_frames = Animation.ansi_frames_for frames, style
     end
 
     def to_rb(outfile='')
@@ -68,8 +68,5 @@ module ConsoleGif
         end
       PROGRAM
     end
-
-    private
-    attr_accessor :style, :imagelist
   end
 end
