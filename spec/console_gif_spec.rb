@@ -351,18 +351,18 @@ RSpec.describe ConsoleGif do
   end
 
 
-  context 'pixel runs', t:true do
-    def pixel_runs(pixel_hashes)
-      pixels = pixel_hashes.map do |hash|
+  context 'pixel runs' do
+    def row_runs(row_hashes)
+      pixels = row_hashes.map do |hash|
         hash[:opaque] = true
         hash[:resolution] ||= ConsoleGif::Pixel.resolution
         ConsoleGif::Pixel.new hash
       end
-      ConsoleGif::PixelRun.for pixels
+      ConsoleGif::PixelRun.for_row pixels
     end
 
     it 'consolidates pixels that are equal into a run' do
-      runs = pixel_runs [
+      runs = row_runs [
         {red:0, green:0, blue:0},
         {red:0, green:0, blue:0},
         {red:0, green:1, blue:0},
@@ -382,12 +382,61 @@ RSpec.describe ConsoleGif do
     end
 
     it 'has the same ansi code as the pixels it wraps, but with each one\'s character' do
-      run = pixel_runs([
+      run = row_runs([
         {red:2, green:0, blue:0},
         {red:2, green:0, blue:0},
       ]).first
       pixel = run.first
       expect(run.to_ansi).to eq "\e[#{pixel.bg_ansi_colour}m#{pixel.characters * 2}\e[#{pixel.bg_off}m"
+    end
+
+    class FakePixel
+      attr_accessor :name
+      def initialize(name)
+        self.name = name
+      end
+
+      def inspect
+        "#<FakePixel #{name.inspect}>"
+      end
+
+      def ==(other)
+        name == other.name
+      end
+    end
+
+    def bg(n)
+      ConsoleGif::BackgroundPixelRun.new(n)
+    end
+
+    def down(n)
+      ConsoleGif::SkipLines.new(n)
+    end
+
+    def frame_runs(frames)
+      ConsoleGif::PixelRun.for_frames(frames)
+    end
+
+    it 'chooses the background colour when runs of background colour are longer' do
+      r, g, b = FakePixel.new(:red), FakePixel.new(:green), FakePixel.new(:blue)
+      frame1 = [[r, g, g, g]]
+      frame2 = [[r, r, g, g]] # chooses pixels, bg
+      frame3 = [[r, r, g, r]] # chooses bg, pixels
+      frames = frame_runs [frame1, frame2, frame3]
+      expect(frames.length).to eq 3
+      expect(frames[0].first.map(&:pixels)).to eq [[r], [g, g, g]]
+      expect(frames[1].first.map(&:pixels)).to eq [[r, r], [bg(2)]]
+      expect(frames[2].first.map(&:pixels)).to eq [[bg(3)], [r]]
+    end
+
+    it 'swaps rows that are entirely background with a command to move the cursor down', t:true do
+      r, g, b = FakePixel.new(:red), FakePixel.new(:green), FakePixel.new(:blue)
+      frame = [[r,r,r], [g,g,g]]
+      frames = frame_runs [frame, frame, frame]
+      expect(frames.length).to eq 3
+      expect(frames[0].map { |rows| rows.map(&:pixels) }).to eq [[[r, r, r]], [[g, g, g]]]
+      expect(frames[1].map { |rows| rows.map(&:pixels) }).to eq [[down(2)]]
+      expect(frames[2].map { |rows| rows.map(&:pixels) }).to eq [[down(2)]]
     end
   end
 

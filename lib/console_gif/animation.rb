@@ -32,12 +32,6 @@ module ConsoleGif
       end
     end
 
-    def self.pixel_runs_for(frames)
-      frames.map do |rows|
-        rows.map { |row| PixelRun.for row }
-      end
-    end
-
 
     attr_accessor :style, :imagelist, :frames, :ansi_frames, :pixel_runs
     def initialize(gifdata, style)
@@ -45,7 +39,7 @@ module ConsoleGif
       self.imagelist   = Magick::ImageList.new.from_blob(gifdata).coalesce.remap
       self.frames      = Animation.frames_for imagelist
       self.ansi_frames = Animation.ansi_frames_for frames, style
-      self.pixel_runs  = Animation.pixel_runs_for ansi_frames
+      self.pixel_runs  = PixelRun.for_frames ansi_frames
     end
 
     def to_rb(outfile='')
@@ -56,19 +50,20 @@ module ConsoleGif
         Zlib::Deflate.deflate(frame)
       }
 
+      topleft     = "\e[H".inspect
       clear       = "\e[H\e[2J".inspect
       hide_cursor = "\e[?25l".inspect
       show_cursor = "\e[?25h".inspect
       outfile << <<-PROGRAM.gsub(/^ {8}/, '')
         require 'zlib'
         frames = [#{compressed_frames.map(&:inspect).join(",\n  ")}
-        ]
+        ].map { |frame| Zlib::Inflate.inflate frame }
         begin
           print #{clear}#{hide_cursor}
           frames.each.with_index 1 do |frame, nxt|
-            print Zlib::Inflate.inflate frame
+            print frame
             sleep 0.1
-            print #{clear} if frames[nxt]
+            print #{topleft} if frames[nxt]
           end
           puts
         ensure
