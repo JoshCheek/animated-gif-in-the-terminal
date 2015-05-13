@@ -64,15 +64,19 @@ module ConsoleGif
         require 'zlib'
         frames = [#{compressed_frames.map(&:inspect).join(",\n  ")}
         ]
+        do_break    = #{!loop}
+        interrupted = false
+        trap("INT") { interrupted = do_break = true }
         begin
           loop do
             print #{clear}#{hide_cursor}
             frames.each.with_index 1 do |frame, nxt|
               print Zlib::Inflate.inflate frame
               sleep 0.1
+              break if interrupted
               print #{clear} if frames[nxt]
             end
-            #{'break' unless loop}
+            break if do_break
           end
           puts
         ensure
