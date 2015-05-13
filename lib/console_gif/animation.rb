@@ -39,13 +39,14 @@ module ConsoleGif
     end
 
 
-    attr_accessor :style, :imagelist, :frames, :ansi_frames, :pixel_runs
-    def initialize(gifdata, style)
+    attr_accessor :style, :imagelist, :frames, :ansi_frames, :pixel_runs, :loop
+    def initialize(gifdata, style: :small, loop: false)
       self.style       = style
       self.imagelist   = Magick::ImageList.new.from_blob(gifdata).coalesce.remap
       self.frames      = Animation.frames_for imagelist
       self.ansi_frames = Animation.ansi_frames_for frames, style
       self.pixel_runs  = Animation.pixel_runs_for ansi_frames
+      self.loop        = loop
     end
 
     def to_rb(outfile='')
@@ -64,11 +65,14 @@ module ConsoleGif
         frames = [#{compressed_frames.map(&:inspect).join(",\n  ")}
         ]
         begin
-          print #{clear}#{hide_cursor}
-          frames.each.with_index 1 do |frame, nxt|
-            print Zlib::Inflate.inflate frame
-            sleep 0.1
-            print #{clear} if frames[nxt]
+          loop do
+            print #{clear}#{hide_cursor}
+            frames.each.with_index 1 do |frame, nxt|
+              print Zlib::Inflate.inflate frame
+              sleep 0.1
+              print #{clear} if frames[nxt]
+            end
+            #{'break' unless loop}
           end
           puts
         ensure

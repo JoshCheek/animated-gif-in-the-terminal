@@ -8,7 +8,7 @@ RSpec.describe ConsoleGif do
   def animation_for(fixture_filename, style: :small)
     fixture_filepath = fixture_path fixture_filename
     gifdata          = File.read(fixture_filepath)
-    ConsoleGif::Animation.new(gifdata, style)
+    ConsoleGif::Animation.new(gifdata, style: style)
   end
 
   describe 'Binary' do
@@ -97,6 +97,14 @@ RSpec.describe ConsoleGif do
           expect(parse([])[:print_help]).to eq false
           expect(parse(['-h'])[:print_help]).to eq true
           expect(parse(['--help'])[:print_help]).to eq true
+        end
+      end
+
+      describe 'loop' do
+        it 'can be set to true with "-l" and "--loop"' do
+          expect(parse([])[:loop]).to eq false
+          expect(parse(['-l'])[:loop]).to eq true
+          expect(parse(['--loop'])[:loop]).to eq true
         end
       end
     end
@@ -351,7 +359,7 @@ RSpec.describe ConsoleGif do
   end
 
 
-  context 'pixel runs', t:true do
+  context 'pixel runs' do
     def pixel_runs(pixel_hashes)
       pixels = pixel_hashes.map do |hash|
         hash[:opaque] = true

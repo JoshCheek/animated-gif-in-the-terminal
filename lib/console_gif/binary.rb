@@ -11,6 +11,8 @@ module ConsoleGif
       Options:
         -h --help             # This help screen
 
+        -l --loop             # loop the animation (you'll have to send an interrupt to stop it)
+
         -s --style STYLE      # Set the output style (STYLE must be either "small", or "sharp")
                               # Default is "small"
                               #
@@ -53,8 +55,12 @@ module ConsoleGif
 
       output_file = parsed.fetch :output_file
       input_file  = parsed.fetch :input_file
+      loop        = parsed.fetch :loop
       gifdata     = (input_file.respond_to?(:read) ? input_file.read : File.read(input_file))
-      print       = lambda { |stream| ConsoleGif::Animation.new(gifdata, parsed.fetch(:style)).to_rb(stream) }
+      print       = lambda do |stream|
+        animation = ConsoleGif::Animation.new gifdata, loop: loop, style: parsed.fetch(:style)
+        animation.to_rb(stream)
+      end
       output_file.respond_to?(:write) ? print.call(output_file) : File.open(output_file, 'w', &print)
       return true
     rescue Errno::ENOENT => e
@@ -77,6 +83,7 @@ module ConsoleGif
         print_help:     false,
         output_file:    default_out,
         input_file:     default_in,
+        loop:           false,
       }
 
       until args.empty?
@@ -99,6 +106,8 @@ module ConsoleGif
           end
         when '-h', '--help'
           parsed[:print_help] = true
+        when '-l', '--loop'
+          parsed[:loop] = true
         else
           parsed[:filenames_seen] << arg
           parsed[:input_file] = arg
