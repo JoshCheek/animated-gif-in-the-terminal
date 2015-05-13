@@ -7,13 +7,23 @@ module ConsoleGif
     end
 
     def to_ansi
-      color_on  = "\e[#{top.fg_ansi_colour};#{bottom.bg_ansi_colour}m"
-      color_off = "\e[#{top.fg_off        };#{bottom.bg_off        }m"
-      "#{color_on}#{character}#{color_off}"
+      "\e[#{ansi_color}m#{characters}\e[#{ansi_color_off}m"
     end
 
-    def character
+    def ansi_color
+      "#{top.fg_ansi_colour};#{bottom.bg_ansi_colour}"
+    end
+
+    def ansi_color_off
+      "#{top.ansi_color_off};#{bottom.ansi_color_off}"
+    end
+
+    def characters
       top.opaque? ? '▀' : ' '
+    end
+
+    def ==(condensed_pixel)
+      top == condensed_pixel.top && bottom == condensed_pixel.bottom
     end
   end
 end

@@ -32,17 +32,24 @@ module ConsoleGif
       end
     end
 
+    def self.pixel_runs_for(frames)
+      frames.map do |rows|
+        rows.map { |row| PixelRun.for row }
+      end
+    end
 
-    attr_accessor :style, :imagelist, :frames, :ansi_frames
+
+    attr_accessor :style, :imagelist, :frames, :ansi_frames, :pixel_runs
     def initialize(gifdata, style)
       self.style       = style
       self.imagelist   = Magick::ImageList.new.from_blob(gifdata).coalesce.remap
       self.frames      = Animation.frames_for imagelist
       self.ansi_frames = Animation.ansi_frames_for frames, style
+      self.pixel_runs  = Animation.pixel_runs_for ansi_frames
     end
 
     def to_rb(outfile='')
-      compressed_frames = ansi_frames.map { |rows|
+      compressed_frames = pixel_runs.map { |rows|
         frame = rows.map { |pixels| pixels.map &:to_ansi }
                     .map(&:join)
                     .join("\n")

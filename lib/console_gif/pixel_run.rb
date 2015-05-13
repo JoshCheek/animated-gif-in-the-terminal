@@ -20,15 +20,15 @@ module ConsoleGif
     end
 
     def to_ansi
-      "\e[#{ansi_color}m#{characters}\e[#{bg_off}m"
+      "\e[#{ansi_color}m#{characters}\e[#{ansi_color_off}m"
     end
 
     def ansi_color
       first.ansi_color
     end
 
-    def bg_off
-      first.bg_off
+    def ansi_color_off
+      first.ansi_color_off
     end
 
     def characters

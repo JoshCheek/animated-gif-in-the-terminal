@@ -303,7 +303,7 @@ RSpec.describe ConsoleGif do
     end
 
     it 'uses a square for the top row, and leaves the bottom row blank' do
-      expect(pixels.first.character).to eq '▀'
+      expect(pixels.first.characters).to eq '▀'
     end
 
     it 'uses the top pixel\'s foreground colour and the bottom pixel\'s background colour' do
@@ -341,7 +341,7 @@ RSpec.describe ConsoleGif do
     end
 
     it 'uses 2 spaces for the pixel' do
-      expect(pixel1.character).to eq '  '
+      expect(pixel1.characters).to eq '  '
     end
 
     it 'uses the pixel\'s background colour' do
@@ -387,7 +387,7 @@ RSpec.describe ConsoleGif do
         {red:2, green:0, blue:0},
       ]).first
       pixel = run.first
-      expect(run.to_ansi).to eq "\e[#{pixel.bg_ansi_colour}m#{pixel.character * 2}\e[#{pixel.bg_off}m"
+      expect(run.to_ansi).to eq "\e[#{pixel.bg_ansi_colour}m#{pixel.characters * 2}\e[#{pixel.bg_off}m"
     end
   end
 
