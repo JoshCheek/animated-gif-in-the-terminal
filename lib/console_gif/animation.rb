@@ -2,6 +2,7 @@ require 'zlib'
 require 'rmagick'
 require 'console_gif/pixel'
 require 'console_gif/condensed_pixel'
+require 'console_gif/pixel_run'
 
 module ConsoleGif
   class Animation

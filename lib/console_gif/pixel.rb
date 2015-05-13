@@ -34,15 +34,19 @@ module ConsoleGif
     end
 
     def to_ansi
-      "\e[#{bg_ansi_colour}m#{character}\e[#{bg_off}m"
+      "\e[#{bg_ansi_colour}m#{characters}\e[#{bg_off}m"
+    end
+
+    def ansi_color
+      bg_ansi_colour
     end
 
     def fg_ansi_colour
-      opaque? ? "38;5;#{ansi_color}" : fg_off
+      opaque? ? "38;5;#{ansi_rgb_index}" : fg_off
     end
 
     def bg_ansi_colour
-      opaque? ? "48;5;#{ansi_color}" : bg_off
+      opaque? ? "48;5;#{ansi_rgb_index}" : bg_off
     end
 
     def opaque?
@@ -57,11 +61,17 @@ module ConsoleGif
       '  '
     end
 
-    def ansi_color
+    alias characters character
+
+    def ansi_rgb_index
       offset = 16 # I think these are for the system colors (30-37, 90-97)
       offset + (red   * resolution * resolution) +
                (green * resolution             ) +
                (blue                           )
+    end
+
+    def ==(pixel)
+      red == pixel.red && green == pixel.green && blue == pixel.blue && opaque? == pixel.opaque?
     end
   end
 end

@@ -351,6 +351,47 @@ RSpec.describe ConsoleGif do
   end
 
 
+  context 'pixel runs', t:true do
+    def pixel_runs(pixel_hashes)
+      pixels = pixel_hashes.map do |hash|
+        hash[:opaque] = true
+        hash[:resolution] ||= ConsoleGif::Pixel.resolution
+        ConsoleGif::Pixel.new hash
+      end
+      ConsoleGif::PixelRun.for pixels
+    end
+
+    it 'consolidates pixels that are equal into a run' do
+      runs = pixel_runs [
+        {red:0, green:0, blue:0},
+        {red:0, green:0, blue:0},
+        {red:0, green:1, blue:0},
+        {red:0, green:0, blue:1},
+        {red:2, green:0, blue:0},
+        {red:2, green:0, blue:0},
+      ]
+
+      reds = runs.map { |run| run.map &:red }
+      expect(reds).to eq [[0, 0], [0], [0], [2, 2]]
+
+      reds = runs.map { |run| run.map &:green }
+      expect(reds).to eq [[0, 0], [1], [0], [0, 0]]
+
+      reds = runs.map { |run| run.map &:blue }
+      expect(reds).to eq [[0, 0], [0], [1], [0, 0]]
+    end
+
+    it 'has the same ansi code as the pixels it wraps, but with each one\'s character' do
+      run = pixel_runs([
+        {red:2, green:0, blue:0},
+        {red:2, green:0, blue:0},
+      ]).first
+      pixel = run.first
+      expect(run.to_ansi).to eq "\e[#{pixel.bg_ansi_colour}m#{pixel.character * 2}\e[#{pixel.bg_off}m"
+    end
+  end
+
+
   context 'integration', integration: true do
     example 'small image' do
       expect(animation_for('owl.gif', style: :small).to_rb)
