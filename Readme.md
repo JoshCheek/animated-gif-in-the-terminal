@@ -40,7 +40,7 @@ $ bin/gif2rb examples/kitten.gif -s sharp | ruby -
 ImageMagick
 -----------
 
-```ruby
+```sh
 # Turn the white bg to transparent
 convert pony.gif -alpha set -channel RGBA -fuzz '20%' -fill none -floodfill +0+0 black pony2.gif
 
@@ -56,8 +56,16 @@ convert pony.gif -crop 88x80+34+40 pony4.gif
 # Okay, in the end, this is what I actually went with
 convert pony.gif -crop 88x80+34+40 +repage -scale 50% pony4.gif
 
-# Fixing disposal and alpha for pacman
-convert -dispose Previous pacman.gif -alpha set -channel RGBA -fuzz '20%' -fill none -floodfill +0+0 black -scale 20% pacman3.gif
+# Fixing disposal and alpha for pacman, scaling down, cropping the border (still doing this by trial and error >.<
+$ convert -dispose Previous pacman.gif \
+          -alpha set                   \
+          -channel RGBA                \
+          -fuzz '20%'                  \
+          -fill none                   \
+          -floodfill +0+0 black        \
+          -scale 20%                   \
+          -crop 100%x25+0+25 +repage   \
+          pacman3.gif
 ```
 
 
