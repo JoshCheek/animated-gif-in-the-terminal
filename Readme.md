@@ -37,6 +37,30 @@ $ bin/gif2rb examples/owl.gif | ruby -
 $ bin/gif2rb examples/kitten.gif -s sharp | ruby -
 ```
 
+ImageMagick
+-----------
+
+```ruby
+# Turn the white bg to transparent
+convert pony.gif -alpha set -channel RGBA -fuzz '20%' -fill none -floodfill +0+0 black pony2.gif
+
+# Crop the unused space (WxH+X+Y)
+convert pony.gif -crop 88x80+34+40 pony4.gif
+
+# Trim bounds (didn't work)
+# convert anim_bgnd.gif -layers TrimBounds anim_trim_bounds.gif
+
+# Extract frames from the animation
+# convert pony.gif -scene 1 +adjoin frame_%03d.gif
+
+# Okay, in the end, this is what I actually went with
+convert pony.gif -crop 88x80+34+40 +repage -scale 50% pony4.gif
+
+# Fixing disposal and alpha for pacman
+convert -dispose Previous pacman.gif -alpha set -channel RGBA -fuzz '20%' -fill none -floodfill +0+0 black -scale 20% pacman3.gif
+```
+
+
 Steal
 -----
 
