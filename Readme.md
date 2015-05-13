@@ -66,6 +66,9 @@ $ convert -dispose Previous pacman.gif \
           -scale 20%                   \
           -crop 100%x25+0+25 +repage   \
           pacman3.gif
+
+# deleting frames we don't want
+$ convert examples/nyan.gif -delete 5-8 -scale 11% examples/nyan.gif
 ```
 
 
