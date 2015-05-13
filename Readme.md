@@ -9,8 +9,17 @@ What?
 Try
 ---
 
+Most of these loop forever, hold control and press C to interrupt them.
+
 ```sh
-$ curl -sL http://bit.ly/1DRCK7q | ruby -
+$ curl -sL http://bit.ly/1DRCK7q | ruby -    # owl small
+$ curl -sL http://bit.ly/1EEKZ7v | ruby -    # owl sharp
+$ curl -sL http://bit.ly/1JdRkxh | ruby -    # pacman small
+$ curl -sL http://bit.ly/1HhjojP | ruby -    # pacman big
+$ curl -sL http://bit.ly/1H3EUmQ | ruby -    # pony sharp
+$ curl -sL http://bit.ly/1QJs83R | ruby -    # pony small
+$ curl -sL http://bit.ly/1KK1GD9 | ruby -    # nyan cat
+$ curl -sL http://bit.ly/1A0iNjU | ruby -    # kitten
 ```
 
 Install
